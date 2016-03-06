@@ -1,40 +1,79 @@
-#Step 0: Download file, unzip file, and read in files.
-          #Download the file:
-	        fileURL<-"https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip"
-	        destfile <- "dataset.zip"
-	        download.file(fileURL,destfile)
-	        #unzip the file:
-	        unzip(destfile)
-	        #read in files:
-	        x_test <- read.table("./UCI HAR Dataset/test/X_test.txt")
-	        y_test <- read.table("./UCI HAR Dataset/test/y_test.txt")
-	        x_train <- read.table("./UCI HAR Dataset/train/X_train.txt")
-	        y_train <- read.table("./UCI HAR Dataset/train/y_train.txt")
-	        subject_test <- read.table("./UCI HAR Dataset/test/subject_test.txt")
-	        subject_train <- read.table("./UCI HAR Dataset/train/subject_train.txt")
-	        activities_labels <- read.table("./UCI HAR Dataset/activity_labels.txt")
-	        features <- read.table("./UCI HAR Dataset/features.txt")
+##Step 0: Download file, unzip file, and read in files.
+        
+        ##Download zip file from provided url to your working directory
+        download.file("https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip", destfile = "accelerometers.zip")
 	
+	##unzip file
+	x <- unzip("accelerometers.zip")
+	
+	##print unzipped file to view contents
+	x
+	
+	##read test & train data
+	test_data <- read.table(x[15], header = FALSE)
+	train_data <- read.table(x[27], header = FALSE)
+	
+	##read features & subset variable names
+	features <- read.table(x[2], header = FALSE)
+	features1 <- features$V2
+
 #Step 1: Merges the training and the test sets to create one data set.
-	        x_all <- rbind(x_train,x_test)
-	        y_all <- rbind(y_train,y_test)
-	        subject_all <-rbind(subject_train,subject_test)
-	        colnames(x_all) <- features[,2]
-	        all <- cbind(x_all,y_all,subject_all)
-	        all <- rename(all, activities = v1, subject = v1.1)
-	        colnames(all[562:563]) <- c("activities","subject")
-	        
-#Step 2: Extract only the measurements on the mean and standard deviation for each measurement. 
-	        index_of_means_stds <- grep("mean\\(\\)|std\\(\\)", names(all))
-	        means_stds <- all[, index_of_means_stds]
-	        
+	##combine test & train data
+	test_train_data <- rbind(test_data, train_data)
+
+	##apply variable names
+	names(test_train_data) <- features1
+
+	##read activity labels
+	test_activity <- read.table(x[16], header = FALSE)
+	train_activity <- read.table(x[28], header = FALSE)
+
+	##combine activity labels
+	test_train_activity <- rbind(test_activity, train_activity)
+
+	#name activity column
+	names(test_train_activity) <- c("activity")
+
+	##read subject numbers
+	test_subject <- read.table(x[14], header = FALSE)
+	train_subject <- read.table(x[26], header = FALSE)
+
+	##combine subject numbers
+	test_train_subject <- rbind(test_subject, train_subject)
+
+	##name subject column
+	names(test_train_subject) <-c("subject")
+
+	##combines columns
+	my_df <- cbind(test_train_subject, test_train_activity, test_train_data)
+
+#Step 2: Extract only measurements on the mean and standard deviation
+	my_df_mean_sd <-my_df[, grep("mean|std|activity|subject", names(my_df), value = TRUE)]
+
 #Step 3: Uses descriptive activity names to name the activities in the data set.
-	        names(all)[562] <- "activities"
-	        
+	##convert acitivty variable to factor
+	my_df_mean_sd$activity <- factor(my_df_mean_sd$activity)
+
 #Step 4: Appropriately labels the data set with descriptive variable names. 
-	        names(all)[563] <- "subject"
-	        
-#Step 5: From the data set in step 4, creates a second, independent tidy data set with the average of each variable for each activity and each subject.
-	        indytidydataset <- all[, 3:dim(all)[2]] 
-	        indytidydatasetmean <- aggregate(indytidydataset,list(all$subject, all$activities), mean)        
-	        write.table(indytidydatasetmean,"./tidydataset.txt")
+	##use plyr package revalue function to make activity names descriptive
+	library(plyr)
+	my_df_mean_sd$activity <- revalue(x = my_df_mean_sd$activity, c("1" = "walking", "2" = "walking_upstairs", "3" = "walking_downstairs", "4" = "sitting", "5" = "standing", "6" = "laying"))
+	##Label the data set with descriptive variable names
+	##convert 't' to "time"
+	names(my_df_mean_sd) <- gsub("^t", "time", names(my_df_mean_sd))
+	##covert 'f' to "FFT"
+	names(my_df_mean_sd) <- gsub("^f", "FFT", names(my_df_mean_sd))
+	##convert "Acc" to "Accelerometer"
+	names(my_df_mean_sd) <- gsub("Acc", "Accelerometer", names(my_df_mean_sd))
+	##convert "Gyro" to "Gyroscope"
+	names(my_df_mean_sd) <- gsub("Gyro", "Gyroscope", names(my_df_mean_sd))
+	##Convert "Mag" to "Magnitude"
+	names(my_df_mean_sd) <- gsub("Mag", "Magnitude", names(my_df_mean_sd))
+	##Convert "BodyBody" to "Body"
+	names(my_df_mean_sd) <- gsub("BodyBody", "Body", names(my_df_mean_sd))
+
+#Step 5: Create second tidy data set with the average of each variable for each activity and each subject
+	y <- aggregate(. ~ subject + activity, my_df_mean_sd, mean)
+	head(y)
+	##save tidy data set to working directory
+	write.table(y, file = "tidy_data_set.txt", row.names = FALSE)
